@@ -137,12 +137,7 @@ MIT License
 
 For bug reports or feedback, please use GitHub Issues or contact us via Discord.
 
-```
 
----
-
-この `README.md` は、プロジェクトルートにそのまま保存して使用可能です。さらにカスタム要望（例：ロゴ画像、バッジ、英語優先表示など）があれば対応できます。
-```
 
 
 ---
