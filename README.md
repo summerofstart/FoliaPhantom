@@ -157,3 +157,5 @@ The source code for this plugin is currently **not public**, but we plan to rele
 # ✨ Decompilation Permission / デコンパイル許可
 
 
+# 🛠 Let’s build it together. / 一緒に作りましょう！
+
