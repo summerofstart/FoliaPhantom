@@ -1,0 +1,9 @@
+summer/foliaPhantom/scheduler/FoliaSchedulerAdapter.class
+summer/foliaPhantom/jar/JarPatcher.class
+summer/foliaPhantom/plugin/WrappedPlugin.class
+summer/foliaPhantom/FoliaPhantom.class
+summer/foliaPhantom/scheduler/FoliaBukkitTask.class
+summer/foliaPhantom/config/PluginConfig.class
+summer/foliaPhantom/scheduler/SchedulerManager.class
+summer/foliaPhantom/scheduler/FoliaSchedulerProxy.class
+summer/foliaPhantom/plugin/PluginLoader.class
