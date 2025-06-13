@@ -41,16 +41,28 @@ public class FoliaSchedulerAdapter {
     }
 
     public ScheduledTask runRegionSyncTask(Runnable runnable, Location location) {
-         return regionScheduler.run(plugin, location, task -> runnable.run());
+        if (location == null || location.getWorld() == null) {
+            plugin.getLogger().severe("[PhantomShed] Task for plugin " + plugin.getName() + " requires a valid location for runRegionSyncTask, but location was invalid. Task not scheduled.");
+            return null;
+        }
+        return regionScheduler.run(plugin, location, task -> runnable.run());
     }
 
     public ScheduledTask runRegionDelayedTask(Runnable runnable, Location location, long delayTicks) {
+        if (location == null || location.getWorld() == null) {
+            plugin.getLogger().severe("[PhantomShed] Task for plugin " + plugin.getName() + " requires a valid location for runRegionDelayedTask, but location was invalid. Task not scheduled.");
+            return null;
+        }
         long safeDelay = delayTicks <= 0 ? 1 : delayTicks;
         return regionScheduler.runDelayed(plugin, location, task -> runnable.run(), safeDelay);
     }
 
     public ScheduledTask runRegionRepeatingTask(Runnable runnable, Location location,
                                                 long initialDelayTicks, long periodTicks) {
+        if (location == null || location.getWorld() == null) {
+            plugin.getLogger().severe("[PhantomShed] Task for plugin " + plugin.getName() + " requires a valid location for runRegionRepeatingTask, but location was invalid. Task not scheduled.");
+            return null;
+        }
         long safeInitial = initialDelayTicks <= 0 ? 1 : initialDelayTicks;
         long safePeriod = periodTicks <= 0 ? 1 : periodTicks;
         return regionScheduler.runAtFixedRate(plugin, location, task -> runnable.run(),
@@ -65,14 +77,37 @@ public class FoliaSchedulerAdapter {
 
     private Location getDefaultLocation() {
         try {
-            // Ensure this runs on the main thread or is otherwise safe
-            if (Bukkit.getServer().isPrimaryThread()) {
-                 World world = Bukkit.getWorlds().isEmpty() ? null : Bukkit.getWorlds().get(0);
-                 return (world != null) ? world.getSpawnLocation() : null;
+            // Check if plugin.getServer() is null
+            if (plugin.getServer() == null) {
+                plugin.getLogger().warning("[PhantomShed] plugin.getServer() is null, cannot determine primary thread. Unable to get default location.");
+                return null;
             }
-            return null; // Cannot safely get default location off-main-thread
+
+            // Ensure this runs on the main thread or is otherwise safe
+            if (!plugin.getServer().isPrimaryThread()) {
+                plugin.getLogger().warning("[PhantomShed] getDefaultLocation called off main thread for plugin " + plugin.getName() + ". This is not safe. Returning null.");
+                return null; // Cannot safely get default location off-main-thread
+            }
+
+            if (Bukkit.getWorlds().isEmpty()) {
+                plugin.getLogger().warning("[PhantomShed] No worlds are loaded. Cannot get default location for plugin " + plugin.getName() + ".");
+                return null;
+            }
+
+            World world = Bukkit.getWorlds().get(0);
+            if (world == null) {
+                plugin.getLogger().warning("[PhantomShed] Primary world (index 0) is null. Cannot get default location for plugin " + plugin.getName() + ".");
+                return null;
+            }
+
+            Location spawnLocation = world.getSpawnLocation();
+            if (spawnLocation == null) {
+                plugin.getLogger().warning("[PhantomShed] Primary world's spawn location is null for plugin " + plugin.getName() + ". Cannot get default location.");
+                return null;
+            }
+            return spawnLocation;
         } catch (Exception e) {
-            // plugin.getLogger().log(java.util.logging.Level.WARNING, "Error getting default location", e);
+            plugin.getLogger().log(java.util.logging.Level.WARNING, "[PhantomShed] Error getting default location for plugin " + plugin.getName(), e);
             return null;
         }
     }

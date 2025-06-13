@@ -86,6 +86,12 @@ public class FoliaPhantom extends JavaPlugin {
                     // For this specific step, we focus on replacing loadWrappedPlugin with WrappedPlugin instantiation.
                     summer.foliaPhantom.config.PluginConfig config = new summer.foliaPhantom.config.PluginConfig(name, originalPath, patchedPath, foliaEnabled);
 
+                    // Check if a plugin with the same name is already loaded
+                    if (getServer().getPluginManager().getPlugin(config.name()) != null) {
+                        getLogger().warning("[Phantom][" + config.name() + "] Plugin with this name is already loaded by the server. Skipping wrapping by FoliaPhantom to prevent duplication.");
+                        continue; // Skip to the next plugin configuration
+                    }
+
                     getLogger().info("[Phantom][" + config.name() + "] Processing plugin configuration...");
                     WrappedPlugin wrappedPlugin = new WrappedPlugin(config, pluginLoader, getDataFolder(), getLogger());
                     if (wrappedPlugin.getBukkitPlugin() != null) {

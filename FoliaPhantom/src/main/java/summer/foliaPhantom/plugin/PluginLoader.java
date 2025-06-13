@@ -52,14 +52,15 @@ public class PluginLoader {
                 logger.info("[Phantom][" + pluginName + "] Plugin loaded successfully: " + plugin.getName() + " v" + plugin.getDescription().getVersion());
             } else {
                 logger.severe("[Phantom][" + pluginName + "] Failed to load plugin from JAR: " + jarFile.getName());
-                // If loadPlugin returns null, but no exception, cleanup classloader
-                closeClassLoader(pluginName);
+                // ClassLoader is no longer closed here immediately.
+                // It will be closed on FoliaPhantom disable or explicit unload.
             }
             return plugin;
         } catch (Exception e) {
             logger.severe("[Phantom][" + pluginName + "] Exception during PluginManager.loadPlugin(): " + e.getMessage());
             e.printStackTrace();
-            closeClassLoader(pluginName); // Ensure cleanup on failure
+            // ClassLoader is no longer closed here immediately.
+            // It will be closed on FoliaPhantom disable or explicit unload.
             return null;
         }
     }
