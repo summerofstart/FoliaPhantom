@@ -8,24 +8,13 @@ public class FoliaBukkitTask implements org.bukkit.scheduler.BukkitTask {
     private final Plugin plugin;
     private final Runnable taskRunnable; // Keep a reference if needed for re-scheduling or inspection
     private boolean cancelled = false; // Internal cancelled state
-    private BooleanSupplier externalCancelState; // Supplier for Folia's task cancelled state, now mutable
+    private final BooleanSupplier externalCancelState; // Supplier for Folia's task cancelled state
 
     public FoliaBukkitTask(int taskId, Plugin plugin, Runnable taskRunnable, BooleanSupplier externalCancelState) {
         this.taskId = taskId;
         this.plugin = plugin;
         this.taskRunnable = taskRunnable;
         this.externalCancelState = externalCancelState;
-    }
-
-    // New constructor for pre-cancelled tasks
-    public FoliaBukkitTask(int taskId, Plugin plugin, Runnable taskRunnable, boolean isPreCancelled) {
-        this.taskId = taskId;
-        this.plugin = plugin;
-        this.taskRunnable = taskRunnable;
-        this.cancelled = isPreCancelled;
-        // If pre-cancelled, externalCancelState can be null or a supplier that returns true.
-        // Setting to null is simpler and isCancelled() will handle it.
-        this.externalCancelState = (isPreCancelled) ? null : () -> false; // Or some other default if not pre-cancelled
     }
 
     @Override
@@ -50,9 +39,7 @@ public class FoliaBukkitTask implements org.bukkit.scheduler.BukkitTask {
 
     @Override
     public boolean isCancelled() {
-        // If internally marked as cancelled, it's cancelled.
-        // Otherwise, if externalCancelState is available, check it.
-        // This handles the case where externalCancelState is null (e.g., for pre-cancelled tasks).
+        // Check both internal flag and Folia's task state
         return cancelled || (externalCancelState != null && externalCancelState.getAsBoolean());
     }
 
