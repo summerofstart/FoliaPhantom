@@ -1,0 +1,9 @@
+/app/FoliaPhantom/src/main/java/summer/foliaPhantom/FoliaPhantom.java
+/app/FoliaPhantom/src/main/java/summer/foliaPhantom/config/PluginConfig.java
+/app/FoliaPhantom/src/main/java/summer/foliaPhantom/jar/JarPatcher.java
+/app/FoliaPhantom/src/main/java/summer/foliaPhantom/plugin/PluginLoader.java
+/app/FoliaPhantom/src/main/java/summer/foliaPhantom/plugin/WrappedPlugin.java
+/app/FoliaPhantom/src/main/java/summer/foliaPhantom/scheduler/FoliaBukkitTask.java
+/app/FoliaPhantom/src/main/java/summer/foliaPhantom/scheduler/FoliaSchedulerAdapter.java
+/app/FoliaPhantom/src/main/java/summer/foliaPhantom/scheduler/FoliaSchedulerProxy.java
+/app/FoliaPhantom/src/main/java/summer/foliaPhantom/scheduler/SchedulerManager.java
