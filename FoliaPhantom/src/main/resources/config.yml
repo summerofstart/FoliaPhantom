@@ -15,6 +15,46 @@ wrapped-plugins:
     patched-jar-path:  "lib/worldedit/WorldEdit-Folia.jar"
     folia-enabled:     true
 
+  - name: Citizens
+    original-jar-path: "lib/citizens/Citizens.jar"
+    patched-jar-path:  "lib/citizens/Citizens-Folia.jar"
+    folia-enabled:     true
+
+  - name: ModelEngine
+    original-jar-path: "lib/model/Model.jar" # As per log: plugins\FoliaPhantom\lib\model\Model.jar
+    patched-jar-path:  "lib/model/Model-Folia.jar"
+    folia-enabled:     true
+
+  - name: Vault
+    original-jar-path: "lib/vault/Vault.jar"
+    patched-jar-path:  "lib/vault/Vault-Folia.jar"
+    folia-enabled:     true # Keep true, though Vault has deeper issues
+
+  - name: NAS
+    original-jar-path: "lib/NAS/nas.jar" # As per log
+    patched-jar-path:  "lib/NAS/nas-F.jar" # Log shows it uses nas-F.jar as patched
+    folia-enabled:     true
+
+  - name: BetonQuest
+    original-jar-path: "lib/sum/BetonQuest.jar" # As per log
+    patched-jar-path:  "lib/sum/BetonQuest-f.jar" # Log shows it uses BetonQuest-f.jar
+    folia-enabled:     true
+
+  - name: mono
+    original-jar-path: "lib/mono/mono.jar" # As per log
+    patched-jar-path:  "lib/mono/mono-Folia.jar"
+    folia-enabled:     true
+
+  - name: BlockRegen.jar # Name in log was "BlockRegen.jar"
+    original-jar-path: "lib/block/BlockRegen.jar" # As per log
+    patched-jar-path:  "lib/block/BlockRegen-Folia.jar"
+    folia-enabled:     true
+
+  - name: uhccore.jar # Name in log was "uhccore.jar", loaded as MOVIE
+    original-jar-path: "lib/MOVIE.jar" # As per log (original path was MOVIE.jar)
+    patched-jar-path:  "lib/MOVIE-Folia.jar" # Assuming a folia version for consistency
+    folia-enabled:     true
+
   # もし他の外部プラグインを追加したい場合は、以下のようにエントリを増やしてください:
   # - name: AnotherPlugin
   #   original-jar-path: "lib/external/AnotherPlugin.jar"

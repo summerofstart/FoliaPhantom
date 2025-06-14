@@ -125,11 +125,11 @@ public class FoliaPhantom extends JavaPlugin {
                 try {
                     getServer().getPluginManager().enablePlugin(plugin);
                     getLogger().info("[Phantom][" + name + "] 有効化完了.");
-                } catch (Exception ex) {
-                    getLogger().severe("[Phantom][" + name + "] enablePlugin() 例外: " + ex.getMessage());
+                } catch (Throwable ex) { // Catch Throwable to be safe with severe errors
+                    getLogger().severe("[Phantom][" + name + "] Exception during enablePlugin() for " + name + ": " + ex.getMessage());
                     ex.printStackTrace();
-                    getServer().getPluginManager().disablePlugin(this);
-                    return;
+                    // Do not disable FoliaPhantom itself. Log and continue.
+                    // The problematic plugin will likely be left disabled by the server.
                 }
             }
         }
