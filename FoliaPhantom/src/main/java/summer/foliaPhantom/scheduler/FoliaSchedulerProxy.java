@@ -30,15 +30,6 @@ public class FoliaSchedulerProxy implements InvocationHandler {
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         String methodName = method.getName();
-        // Simplified: only intercept methods we are actively proxying to Folia's schedulers.
-        // Delegate all other BukkitScheduler methods to the original scheduler.
-        // This includes isCurrentlyRunning, isQueued, cancelTasks, getPendingTasks etc.
-        // BukkitTask returning methods are the primary ones to intercept.
-
-        // For methods returning BukkitTask (or int for older scheduleSyncXX methods)
-        // we create a FoliaBukkitTask and store the Folia ScheduledTask.
-        // For cancelTask(int), we look up our stored ScheduledTask and cancel it.
-
         Plugin plugin = (args != null && args.length > 0 && args[0] instanceof Plugin) ? (Plugin) args[0] : null;
         Runnable taskRunnable = null;
         if (args != null) {
@@ -50,39 +41,59 @@ public class FoliaSchedulerProxy implements InvocationHandler {
              }
         }
 
-        // Fallback to a default location if one isn't easily derivable or relevant
+        // If plugin is not null and the method is a task scheduling one,
+        // check if the plugin is enabled. If not, delegate to original scheduler.
+        if (plugin != null &&
+            (methodName.equals("runTask") ||
+             methodName.equals("runTaskAsynchronously") ||
+             methodName.equals("runTaskLater") ||
+             methodName.equals("runTaskLaterAsynchronously") ||
+             methodName.equals("runTaskTimer") ||
+             methodName.equals("runTaskTimerAsynchronously") ||
+             methodName.equals("scheduleSyncDelayedTask") ||
+             methodName.equals("scheduleSyncRepeatingTask")) &&
+            !plugin.isEnabled()) {
+
+            // Log this delegation for clarity
+            String pluginName = (plugin.getName() != null) ? plugin.getName() : "Unknown Plugin";
+            LOGGER.info("[FoliaSchedulerProxy] Plugin " + pluginName +
+                        " is not fully enabled (likely in onEnable/onLoad). Delegating scheduler call '" +
+                        methodName + "' to original BukkitScheduler.");
+            return method.invoke(originalScheduler, args);
+        }
+
+        // If plugin is enabled, or method is not one of the above, or plugin is null,
+        // proceed with existing Folia handling logic or delegation to originalScheduler at the end.
         Location defaultLoc = getDefaultLocationSafe(plugin);
 
-
         switch (methodName) {
-             // Methods returning BukkitTask
-             case "runTask": // (plugin, task) -> BukkitTask
+             case "runTask":
                  if (plugin != null && taskRunnable != null) {
                      ScheduledTask foliaTask = foliaAdapter.runRegionSyncTask(taskRunnable, defaultLoc);
                      return createTaskMapping(plugin, taskRunnable, foliaTask);
                  }
                  break;
-             case "runTaskAsynchronously": // (plugin, task) -> BukkitTask
+             case "runTaskAsynchronously":
                   if (plugin != null && taskRunnable != null) {
                      ScheduledTask foliaTask = foliaAdapter.runAsyncTask(taskRunnable, 0);
                      return createTaskMapping(plugin, taskRunnable, foliaTask);
                  }
                  break;
-             case "runTaskLater": // (plugin, task, delay) -> BukkitTask
+             case "runTaskLater":
                  if (plugin != null && taskRunnable != null && args.length >= 3) {
                      long delay = ((Number) args[2]).longValue();
                      ScheduledTask foliaTask = foliaAdapter.runRegionDelayedTask(taskRunnable, defaultLoc, delay);
                      return createTaskMapping(plugin, taskRunnable, foliaTask);
                  }
                  break;
-             case "runTaskLaterAsynchronously": // (plugin, task, delay) -> BukkitTask
+             case "runTaskLaterAsynchronously":
                   if (plugin != null && taskRunnable != null && args.length >= 3) {
                      long delay = ((Number) args[2]).longValue();
                      ScheduledTask foliaTask = foliaAdapter.runAsyncTask(taskRunnable, delay);
                      return createTaskMapping(plugin, taskRunnable, foliaTask);
                  }
                  break;
-             case "runTaskTimer": // (plugin, task, delay, period) -> BukkitTask
+             case "runTaskTimer":
                  if (plugin != null && taskRunnable != null && args.length >= 4) {
                      long delay = ((Number) args[2]).longValue();
                      long period = ((Number) args[3]).longValue();
@@ -90,7 +101,7 @@ public class FoliaSchedulerProxy implements InvocationHandler {
                      return createTaskMapping(plugin, taskRunnable, foliaTask);
                  }
                  break;
-             case "runTaskTimerAsynchronously": // (plugin, task, delay, period) -> BukkitTask
+             case "runTaskTimerAsynchronously":
                  if (plugin != null && taskRunnable != null && args.length >= 4) {
                      long delay = ((Number) args[2]).longValue();
                      long period = ((Number) args[3]).longValue();
@@ -98,16 +109,14 @@ public class FoliaSchedulerProxy implements InvocationHandler {
                      return createTaskMapping(plugin, taskRunnable, foliaTask);
                  }
                  break;
-
-             // Methods returning int (task ID) for older plugins
-             case "scheduleSyncDelayedTask": // (plugin, task, delay) -> int
-                 if (plugin != null && taskRunnable != null && args.length >= 2) { // delay is optional in some BukkitScheduler variants
+             case "scheduleSyncDelayedTask":
+                 if (plugin != null && taskRunnable != null && args.length >= 2) {
                      long delay = (args.length >= 3) ? ((Number) args[2]).longValue() : 0L;
                      ScheduledTask foliaTask = foliaAdapter.runRegionDelayedTask(taskRunnable, defaultLoc, delay);
                      return createTaskMappingAndGetId(plugin, taskRunnable, foliaTask);
                  }
                  break;
-             case "scheduleSyncRepeatingTask": // (plugin, task, delay, period) -> int
+             case "scheduleSyncRepeatingTask":
                   if (plugin != null && taskRunnable != null && args.length >= 4) {
                      long delay = ((Number) args[2]).longValue();
                      long period = ((Number) args[3]).longValue();
@@ -115,56 +124,40 @@ public class FoliaSchedulerProxy implements InvocationHandler {
                      return createTaskMappingAndGetId(plugin, taskRunnable, foliaTask);
                  }
                  break;
-             // scheduleAsyncDelayedTask and scheduleAsyncRepeatingTask also exist but are deprecated
-             // and less common. For simplicity, we'll rely on runTaskLaterAsynchronously/runTaskTimerAsynchronously.
-
              case "cancelTask": // (int) -> void
                  if (args.length >= 1 && args[0] instanceof Integer) {
                      int taskId = (Integer) args[0];
-                     ScheduledTask taskToCancel = taskMap.remove(taskId);
+                     ScheduledTask taskToCancel = taskMap.remove(taskId); // remove it if we are cancelling it
                      if (taskToCancel != null) {
                          foliaAdapter.cancelTask(taskToCancel);
+                     } else {
+                         // If it wasn't our task, pass it to the original scheduler
+                         originalScheduler.cancelTask(taskId);
                      }
-                     // Also call original scheduler's cancelTask in case it's a vanilla task ID
-                     // or if the plugin somehow mixed schedulers.
-                     originalScheduler.cancelTask(taskId);
                  }
                  return null; // void method
-
              case "cancelTasks": // (Plugin) -> void
                  if (plugin != null) {
-                     // Iterate and remove tasks associated with this plugin
-                     taskMap.entrySet().removeIf(entry -> {
-                         // This check assumes FoliaBukkitTask.getOwner() exists and works.
-                         // We don't have direct access to FoliaBukkitTask here, so this is conceptual.
-                         // A better way would be to store plugin with ScheduledTask in taskMap.
-                         // For now, this part is complex to implement perfectly without FoliaBukkitTask instance here.
-                         // So, we'll just call the original.
-                         // A more robust solution would be for FoliaBukkitTask to register itself with its owner.
-                         return false; // Placeholder
-                     });
+                     // This is a simplified version. A more robust version would iterate taskMap
+                     // and cancel tasks associated with 'plugin'.
+                     // For now, just pass to originalScheduler and accept it might not cancel Folia tasks correctly.
                      originalScheduler.cancelTasks(plugin);
                  }
-                 return null; // void method
-
-             case "isCurrentlyRunning": // (int taskId) -> boolean
-             case "isQueued": // (int taskId) -> boolean
-                 // For these, it's hard to give an accurate answer for Folia tasks.
-                 // We can check if our taskMap contains it, implying it was scheduled by us and might be active/queued.
+                 return null;
+             case "isCurrentlyRunning":
+             case "isQueued":
                  if (args.length >= 1 && args[0] instanceof Integer) {
                      int taskId = (Integer) args[0];
-                     if (taskMap.containsKey(taskId)) {
+                     if (taskMap.containsKey(taskId)) { // Check if we know this task
                           ScheduledTask foliaTask = taskMap.get(taskId);
+                          // Check if task is active (not cancelled and not finished)
                           return foliaTask != null && !foliaTask.isCancelled() && foliaTask.getExecutionState() != ScheduledTask.ExecutionState.FINISHED;
                      }
                  }
-                 // Fall through to original scheduler for tasks not in our map
-                 break; // Will be handled by method.invoke outside switch
-
-             // Potentially other methods to consider: getPendingTasks, callSyncMethod
+                 // If not in our map, it might be an original scheduler's task. Fall through.
+                 break;
          }
 
-        // If not handled above, invoke on original scheduler
         return method.invoke(originalScheduler, args);
     }
 
@@ -180,35 +173,8 @@ public class FoliaSchedulerProxy implements InvocationHandler {
         return taskId;
     }
 
-    private Location getDefaultLocationSafe(Plugin plugin) {
-        try {
-            // Requirement 2: Log a warning if the method is called off the main thread
-            if (!Bukkit.getServer().isPrimaryThread()) {
-                String pluginName = (plugin != null) ? plugin.getName() : "Unknown Plugin";
-                LOGGER.warning("getDefaultLocationSafe called off main thread for plugin: " + pluginName + ". Attempting to determine fallback location.");
-            }
-
-            // Requirement 3 & 5: Check if Bukkit.getWorlds() is empty
-            if (Bukkit.getWorlds().isEmpty()) {
-                LOGGER.severe("No worlds available (Bukkit.getWorlds() is empty). Cannot determine a default location.");
-                return null; // Last resort to prevent crashes
-            }
-
-            // Requirement 4: If Bukkit.getWorlds() is not empty, return spawn location of the first world
-            World world = Bukkit.getWorlds().get(0);
-            if (world != null) {
-                return world.getSpawnLocation();
-            } else {
-                // This case should ideally not be reached if Bukkit.getWorlds() is not empty,
-                // but as a safeguard:
-                LOGGER.warning("Primary world (index 0) is null, though Bukkit.getWorlds() was not empty. Cannot determine default location.");
-                return null;
-            }
-        } catch (Exception e) {
-            // General catch block for any other unexpected issues
-            String pluginName = (plugin != null) ? plugin.getName() : "Unknown Plugin";
-            LOGGER.log(java.util.logging.Level.SEVERE, "Exception in getDefaultLocationSafe for plugin: " + pluginName, e);
-            return null;
-        }
+    private Location getDefaultLocationSafe(Plugin pluginContext) {
+        // Delegate to the static method in FoliaSchedulerAdapter
+        return FoliaSchedulerAdapter.getSafeDefaultLocation(pluginContext, LOGGER);
     }
 }

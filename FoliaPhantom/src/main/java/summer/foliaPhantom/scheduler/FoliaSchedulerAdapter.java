@@ -82,15 +82,39 @@ public class FoliaSchedulerAdapter {
     }
 
     private Location getDefaultLocation() {
+        // Delegate to the new static method
+        return getSafeDefaultLocation(this.plugin, this.plugin.getLogger());
+    }
+
+    public static Location getSafeDefaultLocation(Plugin pluginContextForLog, java.util.logging.Logger logger) {
         try {
-            // Ensure this runs on the main thread or is otherwise safe
-            if (Bukkit.getServer().isPrimaryThread()) {
-                 World world = Bukkit.getWorlds().isEmpty() ? null : Bukkit.getWorlds().get(0);
-                 return (world != null) ? world.getSpawnLocation() : null;
+            if (!Bukkit.getServer().isPrimaryThread()) {
+                String pluginName = "System"; // Default if pluginContextForLog is null
+                if (pluginContextForLog != null && pluginContextForLog.getName() != null) {
+                    pluginName = pluginContextForLog.getName();
+                }
+                logger.warning("[" + pluginName + "] getSafeDefaultLocation called off main thread. Location-specific scheduling might be unreliable. No default location will be provided.");
+                return null;
             }
-            return null; // Cannot safely get default location off-main-thread
+            if (Bukkit.getWorlds().isEmpty()) {
+                logger.severe("No worlds available (Bukkit.getWorlds() is empty). Cannot determine a default location for scheduling.");
+                return null;
+            }
+            World world = Bukkit.getWorlds().get(0);
+            if (world != null) {
+                return world.getSpawnLocation();
+            } else {
+                // This case should ideally not be reached if Bukkit.getWorlds() is not empty,
+                // but as a safeguard:
+                logger.warning("Primary world (Bukkit.getWorlds().get(0)) is null, though Bukkit.getWorlds() was not empty. Cannot determine default location.");
+                return null;
+            }
         } catch (Exception e) {
-            // plugin.getLogger().log(java.util.logging.Level.WARNING, "Error getting default location", e);
+            String pluginName = "System"; // Default if pluginContextForLog is null
+            if (pluginContextForLog != null && pluginContextForLog.getName() != null) {
+                pluginName = pluginContextForLog.getName();
+            }
+            logger.log(java.util.logging.Level.SEVERE, "Exception in getSafeDefaultLocation (plugin context: " + pluginName + ")", e);
             return null;
         }
     }
