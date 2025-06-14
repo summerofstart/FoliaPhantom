@@ -11,10 +11,12 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger; // Added import
 // Assuming FoliaBukkitTask will be in the same package
 import summer.foliaPhantom.scheduler.FoliaBukkitTask;
 
 public class FoliaSchedulerProxy implements InvocationHandler {
+    private static final Logger LOGGER = Logger.getLogger("FoliaSchedulerProxy"); // Added logger instance
     private final BukkitScheduler originalScheduler;
     private final FoliaSchedulerAdapter foliaAdapter;
     private final Map<Integer, ScheduledTask> taskMap = new ConcurrentHashMap<>();
@@ -180,19 +182,32 @@ public class FoliaSchedulerProxy implements InvocationHandler {
 
     private Location getDefaultLocationSafe(Plugin plugin) {
         try {
-            if (plugin != null && plugin.getServer().isPrimaryThread()) {
-                World world = Bukkit.getWorlds().isEmpty() ? null : Bukkit.getWorlds().get(0);
-                if (world != null) {
-                    return world.getSpawnLocation();
-                }
-            } else if (Bukkit.getServer().isPrimaryThread()) { // If plugin is null, but still on main thread
-                World world = Bukkit.getWorlds().isEmpty() ? null : Bukkit.getWorlds().get(0);
-                if (world != null) {
-                    return world.getSpawnLocation();
-                }
+            // Requirement 2: Log a warning if the method is called off the main thread
+            if (!Bukkit.getServer().isPrimaryThread()) {
+                String pluginName = (plugin != null) ? plugin.getName() : "Unknown Plugin";
+                LOGGER.warning("getDefaultLocationSafe called off main thread for plugin: " + pluginName + ". Attempting to determine fallback location.");
             }
-            return null;
+
+            // Requirement 3 & 5: Check if Bukkit.getWorlds() is empty
+            if (Bukkit.getWorlds().isEmpty()) {
+                LOGGER.severe("No worlds available (Bukkit.getWorlds() is empty). Cannot determine a default location.");
+                return null; // Last resort to prevent crashes
+            }
+
+            // Requirement 4: If Bukkit.getWorlds() is not empty, return spawn location of the first world
+            World world = Bukkit.getWorlds().get(0);
+            if (world != null) {
+                return world.getSpawnLocation();
+            } else {
+                // This case should ideally not be reached if Bukkit.getWorlds() is not empty,
+                // but as a safeguard:
+                LOGGER.warning("Primary world (index 0) is null, though Bukkit.getWorlds() was not empty. Cannot determine default location.");
+                return null;
+            }
         } catch (Exception e) {
+            // General catch block for any other unexpected issues
+            String pluginName = (plugin != null) ? plugin.getName() : "Unknown Plugin";
+            LOGGER.log(java.util.logging.Level.SEVERE, "Exception in getDefaultLocationSafe for plugin: " + pluginName, e);
             return null;
         }
     }
