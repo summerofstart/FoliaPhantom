@@ -15,34 +15,49 @@ import java.util.logging.Logger; // Added import
 // Assuming FoliaBukkitTask will be in the same package
 import summer.foliaPhantom.scheduler.FoliaBukkitTask;
 
+/**
+ * A dynamic proxy for {@link BukkitScheduler}.
+ * This proxy intercepts scheduler calls. If the server is detected as a Folia server,
+ * it adapts these calls to Folia's scheduling system using {@link FoliaSchedulerAdapter}.
+ * If the server is not Folia, it passes all calls directly to the original {@link BukkitScheduler},
+ * ensuring native behavior and compatibility.
+ */
 public class FoliaSchedulerProxy implements InvocationHandler {
     private static final Logger LOGGER = Logger.getLogger("FoliaSchedulerProxy"); // Added logger instance
     private final BukkitScheduler originalScheduler;
     private final FoliaSchedulerAdapter foliaAdapter;
+    // Flag indicating if the current server environment is Folia-based.
+    private final boolean isFoliaServer;
     private final Map<Integer, ScheduledTask> taskMap = new ConcurrentHashMap<>();
     private int taskIdCounter = 1000; // Start from a higher number to avoid collision with vanilla tasks
 
-    public FoliaSchedulerProxy(BukkitScheduler originalScheduler, FoliaSchedulerAdapter foliaAdapter) {
+    // Modified constructor
+    public FoliaSchedulerProxy(BukkitScheduler originalScheduler, FoliaSchedulerAdapter foliaAdapter, boolean isFoliaServer) {
         this.originalScheduler = originalScheduler;
         this.foliaAdapter = foliaAdapter;
+        this.isFoliaServer = isFoliaServer;
     }
 
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        // Conditional scheduling logic based on detected server type.
+        // If the server is not Folia, all scheduler method calls are passed directly to the
+        // original BukkitScheduler. This ensures that on non-Folia platforms (like Spigot or Paper
+        // without Folia's threaded regions), tasks are handled by the native scheduler,
+        // preventing errors from attempting to use Folia-specific APIs and maintaining
+        // standard Bukkit plugin behavior. The taskMap and Folia-specific handling below
+        // will be skipped entirely.
+        if (!this.isFoliaServer) {
+            return method.invoke(originalScheduler, args);
+        }
+
         String methodName = method.getName();
         Plugin plugin = (args != null && args.length > 0 && args[0] instanceof Plugin) ? (Plugin) args[0] : null;
-        Runnable taskRunnable = null;
-        if (args != null) {
-             for (Object arg : args) {
-                 if (arg instanceof Runnable) {
-                     taskRunnable = (Runnable) arg;
-                     break;
-                 }
-             }
-        }
+        // Removed generic taskRunnable extraction loop
 
         // If plugin is not null and the method is a task scheduling one,
         // check if the plugin is enabled. If not, delegate to original scheduler.
+        // This check uses the 'plugin' variable extracted above.
         if (plugin != null &&
             (methodName.equals("runTask") ||
              methodName.equals("runTaskAsynchronously") ||
@@ -67,64 +82,75 @@ public class FoliaSchedulerProxy implements InvocationHandler {
         Location defaultLoc = getDefaultLocationSafe(plugin);
 
         switch (methodName) {
-             case "runTask":
-                 if (plugin != null && taskRunnable != null) {
-                     ScheduledTask foliaTask = foliaAdapter.runRegionSyncTask(taskRunnable, defaultLoc);
-                     return createTaskMapping(plugin, taskRunnable, foliaTask);
-                 }
-                 break;
-             case "runTaskAsynchronously":
-                  if (plugin != null && taskRunnable != null) {
-                     ScheduledTask foliaTask = foliaAdapter.runAsyncTask(taskRunnable, 0);
-                     return createTaskMapping(plugin, taskRunnable, foliaTask);
-                 }
-                 break;
-             case "runTaskLater":
-                 if (plugin != null && taskRunnable != null && args.length >= 3) {
-                     long delay = ((Number) args[2]).longValue();
-                     ScheduledTask foliaTask = foliaAdapter.runRegionDelayedTask(taskRunnable, defaultLoc, delay);
-                     return createTaskMapping(plugin, taskRunnable, foliaTask);
-                 }
-                 break;
-             case "runTaskLaterAsynchronously":
-                  if (plugin != null && taskRunnable != null && args.length >= 3) {
-                     long delay = ((Number) args[2]).longValue();
-                     ScheduledTask foliaTask = foliaAdapter.runAsyncTask(taskRunnable, delay);
-                     return createTaskMapping(plugin, taskRunnable, foliaTask);
-                 }
-                 break;
-             case "runTaskTimer":
-                 if (plugin != null && taskRunnable != null && args.length >= 4) {
-                     long delay = ((Number) args[2]).longValue();
-                     long period = ((Number) args[3]).longValue();
-                     ScheduledTask foliaTask = foliaAdapter.runRegionRepeatingTask(taskRunnable, defaultLoc, delay, period);
-                     return createTaskMapping(plugin, taskRunnable, foliaTask);
-                 }
-                 break;
-             case "runTaskTimerAsynchronously":
-                 if (plugin != null && taskRunnable != null && args.length >= 4) {
-                     long delay = ((Number) args[2]).longValue();
-                     long period = ((Number) args[3]).longValue();
-                     ScheduledTask foliaTask = foliaAdapter.runAsyncRepeatingTask(taskRunnable, delay, period);
-                     return createTaskMapping(plugin, taskRunnable, foliaTask);
-                 }
-                 break;
-             case "scheduleSyncDelayedTask":
-                 if (plugin != null && taskRunnable != null && args.length >= 2) {
-                     long delay = (args.length >= 3) ? ((Number) args[2]).longValue() : 0L;
-                     ScheduledTask foliaTask = foliaAdapter.runRegionDelayedTask(taskRunnable, defaultLoc, delay);
-                     return createTaskMappingAndGetId(plugin, taskRunnable, foliaTask);
-                 }
-                 break;
-             case "scheduleSyncRepeatingTask":
-                  if (plugin != null && taskRunnable != null && args.length >= 4) {
-                     long delay = ((Number) args[2]).longValue();
-                     long period = ((Number) args[3]).longValue();
-                     ScheduledTask foliaTask = foliaAdapter.runRegionRepeatingTask(taskRunnable, defaultLoc, delay, period);
-                     return createTaskMappingAndGetId(plugin, taskRunnable, foliaTask);
-                 }
-                 break;
-             case "cancelTask": // (int) -> void
+            case "runTask": // runTask(Plugin plugin, Runnable task)
+                if (plugin != null && args.length >= 2 && args[1] instanceof Runnable) {
+                    Runnable task = (Runnable) args[1];
+                    ScheduledTask foliaTask = foliaAdapter.runRegionSyncTask(task, defaultLoc);
+                    return createTaskMapping(plugin, task, foliaTask, true); // isSync = true
+                }
+                break;
+            case "runTaskAsynchronously": // runTaskAsynchronously(Plugin plugin, Runnable task)
+                 if (plugin != null && args.length >= 2 && args[1] instanceof Runnable) {
+                    Runnable task = (Runnable) args[1];
+                    ScheduledTask foliaTask = foliaAdapter.runAsyncTask(task, 0);
+                    return createTaskMapping(plugin, task, foliaTask, false); // isSync = false
+                }
+                break;
+            case "runTaskLater": // runTaskLater(Plugin plugin, Runnable task, long delay)
+                if (plugin != null && args.length >= 3 && args[1] instanceof Runnable && args[2] instanceof Number) {
+                    Runnable task = (Runnable) args[1];
+                    long delay = ((Number) args[2]).longValue();
+                    ScheduledTask foliaTask = foliaAdapter.runRegionDelayedTask(task, defaultLoc, delay);
+                    return createTaskMapping(plugin, task, foliaTask, true); // isSync = true
+                }
+                break;
+            case "runTaskLaterAsynchronously": // runTaskLaterAsynchronously(Plugin plugin, Runnable task, long delay)
+                 if (plugin != null && args.length >= 3 && args[1] instanceof Runnable && args[2] instanceof Number) {
+                    Runnable task = (Runnable) args[1];
+                    long delay = ((Number) args[2]).longValue();
+                    ScheduledTask foliaTask = foliaAdapter.runAsyncTask(task, delay);
+                    return createTaskMapping(plugin, task, foliaTask, false); // isSync = false
+                }
+                break;
+            case "runTaskTimer": // runTaskTimer(Plugin plugin, Runnable task, long delay, long period)
+                if (plugin != null && args.length >= 4 && args[1] instanceof Runnable && args[2] instanceof Number && args[3] instanceof Number) {
+                    Runnable task = (Runnable) args[1];
+                    long delay = ((Number) args[2]).longValue();
+                    long period = ((Number) args[3]).longValue();
+                    ScheduledTask foliaTask = foliaAdapter.runRegionRepeatingTask(task, defaultLoc, delay, period);
+                    return createTaskMapping(plugin, task, foliaTask, true); // isSync = true
+                }
+                break;
+            case "runTaskTimerAsynchronously": // runTaskTimerAsynchronously(Plugin plugin, Runnable task, long delay, long period)
+                if (plugin != null && args.length >= 4 && args[1] instanceof Runnable && args[2] instanceof Number && args[3] instanceof Number) {
+                    Runnable task = (Runnable) args[1];
+                    long delay = ((Number) args[2]).longValue();
+                    long period = ((Number) args[3]).longValue();
+                    ScheduledTask foliaTask = foliaAdapter.runAsyncRepeatingTask(task, delay, period);
+                    return createTaskMapping(plugin, task, foliaTask, false); // isSync = false
+                }
+                break;
+            case "scheduleSyncDelayedTask": // scheduleSyncDelayedTask(Plugin plugin, Runnable task, long delay) or (Plugin plugin, Runnable task)
+                if (plugin != null && args.length >= 2 && args[1] instanceof Runnable) {
+                    Runnable task = (Runnable) args[1];
+                    long delayValue = 0L; // Renamed to avoid conflict with local var 'delay' if method signature changes
+                    if (args.length >= 3 && args[2] instanceof Number) {
+                        delayValue = ((Number) args[2]).longValue();
+                    }
+                    ScheduledTask foliaTask = foliaAdapter.runRegionDelayedTask(task, defaultLoc, delayValue);
+                    return createTaskMappingAndGetId(plugin, task, foliaTask, true); // isSync = true
+                }
+                break;
+            case "scheduleSyncRepeatingTask": // scheduleSyncRepeatingTask(Plugin plugin, Runnable task, long delay, long period)
+                 if (plugin != null && args.length >= 4 && args[1] instanceof Runnable && args[2] instanceof Number && args[3] instanceof Number) {
+                    Runnable task = (Runnable) args[1];
+                    long delay = ((Number) args[2]).longValue();
+                    long period = ((Number) args[3]).longValue();
+                    ScheduledTask foliaTask = foliaAdapter.runRegionRepeatingTask(task, defaultLoc, delay, period);
+                    return createTaskMappingAndGetId(plugin, task, foliaTask, true); // isSync = true
+                }
+                break;
+            case "cancelTask": // (int) -> void
                  if (args.length >= 1 && args[0] instanceof Integer) {
                      int taskId = (Integer) args[0];
                      ScheduledTask taskToCancel = taskMap.remove(taskId); // remove it if we are cancelling it
@@ -161,15 +187,18 @@ public class FoliaSchedulerProxy implements InvocationHandler {
         return method.invoke(originalScheduler, args);
     }
 
-    private FoliaBukkitTask createTaskMapping(Plugin plugin, Runnable runnable, ScheduledTask foliaTask) {
+    private FoliaBukkitTask createTaskMapping(Plugin plugin, Runnable runnable, ScheduledTask foliaTask, boolean isSync) {
         int taskId = taskIdCounter++;
         taskMap.put(taskId, foliaTask);
-        return new FoliaBukkitTask(taskId, plugin, runnable, foliaTask::isCancelled); // Pass cancel state supplier
+        return new FoliaBukkitTask(taskId, plugin, runnable, foliaTask::isCancelled, isSync);
     }
 
-    private int createTaskMappingAndGetId(Plugin plugin, Runnable runnable, ScheduledTask foliaTask) {
+    private int createTaskMappingAndGetId(Plugin plugin, Runnable runnable, ScheduledTask foliaTask, boolean isSync) {
         int taskId = taskIdCounter++;
         taskMap.put(taskId, foliaTask);
+        // Create a FoliaBukkitTask to be consistent, though it's not directly returned by these Bukkit API methods.
+        // The isSync status is primarily for BukkitTask objects that are returned and inspected.
+        new FoliaBukkitTask(taskId, plugin, runnable, foliaTask::isCancelled, isSync);
         return taskId;
     }
 

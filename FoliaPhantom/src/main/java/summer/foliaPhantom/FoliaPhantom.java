@@ -34,6 +34,8 @@ import summer.foliaPhantom.scheduler.SchedulerManager;
  */
 public class FoliaPhantom extends JavaPlugin {
 
+    // Stores whether the server environment is Folia-based, determined at startup.
+    private static boolean isFoliaServer;
     private SchedulerManager schedulerManager;
 
     // 設定から読み込んだ各プラグインのインスタンスを保持
@@ -44,6 +46,9 @@ public class FoliaPhantom extends JavaPlugin {
     @Override
     public void onLoad() {
         getLogger().info("[Phantom] === FoliaPhantom onLoad ===");
+        // Initialize server type detection. This boolean will affect how scheduling is handled.
+        isFoliaServer = detectServerType();
+
         // config.yml を生成/ロード
         saveDefaultConfig();
 
@@ -176,5 +181,29 @@ public class FoliaPhantom extends JavaPlugin {
     /**
      * 生成した各 URLClassLoader を閉じる
      */
+
+    /**
+     * Detects the server type by checking for the existence of a Folia-specific class.
+     * This method is called during onLoad to determine if Folia-specific APIs are available.
+     * @return true if a Folia-specific class (io.papermc.paper.threadedregions.RegionizedServer) is found, false otherwise.
+     */
+    private static boolean detectServerType() {
+        try {
+            Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
+            Bukkit.getLogger().info("[Phantom] Detected Folia server environment.");
+            return true;
+        } catch (ClassNotFoundException e) {
+            Bukkit.getLogger().info("[Phantom] Detected Non-Folia server environment.");
+            return false;
+        }
+    }
+
+    /**
+     * Gets the detected server type.
+     * @return true if the server is determined to be a Folia server, false otherwise.
+     */
+    public static boolean isFoliaServer() {
+        return isFoliaServer;
+    }
 }
 

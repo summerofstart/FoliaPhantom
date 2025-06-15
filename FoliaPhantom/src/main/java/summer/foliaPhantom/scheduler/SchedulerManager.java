@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Server;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitScheduler;
+import summer.foliaPhantom.FoliaPhantom; // Import FoliaPhantom
 import sun.misc.Unsafe; // Required for Unsafe operations
 
 import java.lang.reflect.Field;
@@ -33,6 +34,10 @@ public class SchedulerManager {
      */
     public boolean installProxy() {
         try {
+            // Determine server type (Folia or Non-Folia) to configure the proxy accordingly.
+            boolean isFolia = FoliaPhantom.isFoliaServer();
+            logger.info("[Phantom] Installing scheduler proxy for " + (isFolia ? "Folia" : "Non-Folia") + " environment.");
+
             this.schedulerAdapter = new FoliaSchedulerAdapter(this.owningPlugin);
             obtainUnsafeInstance();
 
@@ -40,7 +45,9 @@ public class SchedulerManager {
             this.proxiedBukkitScheduler = (BukkitScheduler) Proxy.newProxyInstance(
                     BukkitScheduler.class.getClassLoader(),
                     new Class<?>[]{BukkitScheduler.class},
-                    new FoliaSchedulerProxy(this.originalBukkitScheduler, this.schedulerAdapter)
+                    // Pass the detected server type to the FoliaSchedulerProxy.
+                    // This allows the proxy to adapt its behavior (e.g., pass-through on Non-Folia).
+                    new FoliaSchedulerProxy(this.originalBukkitScheduler, this.schedulerAdapter, isFolia)
             );
 
             this.serverInstance = Bukkit.getServer(); // Get current server instance

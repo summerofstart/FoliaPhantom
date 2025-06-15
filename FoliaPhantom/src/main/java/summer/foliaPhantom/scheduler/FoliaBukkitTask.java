@@ -7,14 +7,16 @@ public class FoliaBukkitTask implements org.bukkit.scheduler.BukkitTask {
     private final int taskId;
     private final Plugin plugin;
     private final Runnable taskRunnable; // Keep a reference if needed for re-scheduling or inspection
+    private final boolean isSync; // Stores if the task is synchronous
     private boolean cancelled = false; // Internal cancelled state
     private final BooleanSupplier externalCancelState; // Supplier for Folia's task cancelled state
 
-    public FoliaBukkitTask(int taskId, Plugin plugin, Runnable taskRunnable, BooleanSupplier externalCancelState) {
+    public FoliaBukkitTask(int taskId, Plugin plugin, Runnable taskRunnable, BooleanSupplier externalCancelState, boolean isSync) {
         this.taskId = taskId;
         this.plugin = plugin;
         this.taskRunnable = taskRunnable;
         this.externalCancelState = externalCancelState;
+        this.isSync = isSync;
     }
 
     @Override
@@ -29,12 +31,7 @@ public class FoliaBukkitTask implements org.bukkit.scheduler.BukkitTask {
 
     @Override
     public boolean isSync() {
-        // This is tricky. Folia's tasks are not strictly "sync" in the Bukkit sense.
-        // Most tasks run via FoliaSchedulerProxy are intended to behave like sync tasks
-        // by being region-bound or executed on a global region if no location is specified.
-        // However, truly async tasks are also proxied.
-        // For compatibility, returning true might be safer for plugins expecting sync behavior.
-        return true; // Or determine based on how it was scheduled if possible.
+        return this.isSync;
     }
 
     @Override
