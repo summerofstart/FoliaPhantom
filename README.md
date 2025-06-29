@@ -15,6 +15,7 @@
 - 非同期・リージョン同期スケジューリング両対応
 - Jar の差し替え・再生成処理を自動で実施
 - 複数プラグインの並列ラップに対応
+- Bukkit/Paper の同期的なチャンクAPI呼び出し（`getChunkAt`, `loadChunk`, `regenerateChunk`等）を、Folia対応の非同期処理やリージョンベースの処理に内部的に変換・実行（実験的機能）
 
 ---
 
@@ -42,6 +43,13 @@ wrapped-plugins:
   ➜ 特に `WorldServer`, `MinecraftServer`, `EntityPlayer` などを直接扱うプラグインは正常動作しない場合があります。
 * `Unsafe` を用いたリフレクションで `BukkitScheduler` をフックしています。セキュリティ制限のある環境では動作しない可能性があります。
 * すべての Folia 非対応プラグインを補償するものではありません。
+* **チャンクラッパー機能 (実験的):**
+    * 同期的なチャンクAPI呼び出しのFolia対応変換は、すべてのケースで完璧に動作するとは限りません。特定のプラグインやAPIの使われ方によっては、依然として問題が発生する可能性があります。
+    * この機能はサーバー内部の `World` オブジェクトをプロキシし、一部NMSコードに依存する可能性のある方法で実現されています。Minecraftのバージョンアップにより互換性が失われるリスクがあります。
+    * 同期APIを非同期APIで無理にラップするため、チャンク操作のパフォーマンスが低下する場合があります。特に多数のチャンクを一度に操作するような処理では影響が大きくなる可能性があります。
+    * `Player.getWorld()` で取得される `World` オブジェクトは、現バージョンではプロキシされないため、この方法で取得したワールドに対するチャンク操作はラップされません。`Bukkit.getWorld()` 等で取得したワールドはプロキシ対象です。
+    * Folia API の今後の変更によって、このラッパー機能が影響を受ける可能性があります。
+    * 複雑な処理のため、予期せぬエラー（特にチャンクアクセス関連）が発生する可能性があります。問題発生時はサーバーログを確認してください。
 
 ---
 
@@ -86,6 +94,7 @@ MIT License
 * Supports async and region-based scheduling
 * Re-generates and patches plugin JARs as needed
 * Supports multiple wrapped plugins simultaneously
+* Converts synchronous Bukkit/Paper chunk API calls (e.g., `getChunkAt`, `loadChunk`, `regenerateChunk`) to Folia-compatible asynchronous or region-based operations internally (Experimental).
 
 ---
 
@@ -113,6 +122,13 @@ wrapped-plugins:
   ➜ If a plugin directly interacts with internals like `WorldServer`, `EntityPlayer`, or `MinecraftServer`, it may not function properly.
 * This plugin uses `Unsafe` and reflection to intercept `BukkitScheduler`. It may not work in JVM environments with strict security settings.
 * It does **not guarantee compatibility** with all Folia-unsupported plugins.
+* **Chunk Wrapping Feature (Experimental):**
+    * The conversion of synchronous chunk API calls for Folia compatibility may not work perfectly in all scenarios. Issues might still arise depending on the specific plugin or how the API is used.
+    * This feature proxies server's internal `World` objects and may rely on NMS code, risking incompatibility with Minecraft version updates.
+    * Forcing synchronous behavior on top of asynchronous Folia APIs can lead to performance degradation in chunk operations, especially when handling many chunks at once.
+    * `World` objects obtained via `Player.getWorld()` are not currently proxied by this feature. Chunk operations on such `World` instances will not be wrapped. Worlds obtained via `Bukkit.getWorld()` are targeted for proxying.
+    * Future changes to the Folia API might affect this wrapper's functionality.
+    * Due to the complexity, unexpected errors (especially related to chunk access) may occur. Check server logs if issues arise.
 
 ---
 

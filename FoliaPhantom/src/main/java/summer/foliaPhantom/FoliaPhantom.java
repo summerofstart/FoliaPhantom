@@ -26,6 +26,7 @@ import summer.foliaPhantom.plugin.WrappedPlugin;
 // summer.foliaPhantom.scheduler.FoliaSchedulerAdapter import is not directly used by FoliaPhantom
 // summer.foliaPhantom.scheduler.FoliaSchedulerProxy import is not directly used by FoliaPhantom
 import summer.foliaPhantom.scheduler.SchedulerManager;
+import summer.foliaPhantom.world.WorldProxyManager;
 // FoliaBukkitTask is used by FoliaSchedulerProxy, direct import might not be needed in FoliaPhantom itself
 
 /**
@@ -37,6 +38,7 @@ public class FoliaPhantom extends JavaPlugin {
     // Stores whether the server environment is Folia-based, determined at startup.
     private static boolean isFoliaServer;
     private SchedulerManager schedulerManager;
+    private WorldProxyManager worldProxyManager;
 
     // 設定から読み込んだ各プラグインのインスタンスを保持
     private final Map<String, WrappedPlugin> wrappedPlugins = new ConcurrentHashMap<>();
@@ -63,6 +65,17 @@ public class FoliaPhantom extends JavaPlugin {
                 // return; // if inside onLoad and further loading depends on it
             } else {
                 getLogger().info("[Phantom] SchedulerManager initialized and proxy installed.");
+            }
+
+            // Worldプロキシを初期化 (SchedulerManagerの後、プラグインロード前が良い)
+            if (isFoliaServer) { // Foliaサーバーの場合のみWorldプロキシを試みる
+                this.worldProxyManager = new WorldProxyManager(this);
+                if (!this.worldProxyManager.initializeAndProxyWorlds()) {
+                    getLogger().severe("[Phantom] Critical error: Failed to install World proxy. Chunk operations might not be correctly handled.");
+                    // Worldプロキシの失敗はSchedulerほど致命的ではないかもしれないので、プラグインの無効化はしない
+                } else {
+                    getLogger().info("[Phantom] WorldProxyManager initialized and proxies installed.");
+                }
             }
 
             // config.yml の wrapped-plugins セクションを読み込む
@@ -166,6 +179,12 @@ public class FoliaPhantom extends JavaPlugin {
         // Individual wrappedPlugin.unload() could be called if we want to close classloaders one by one
         // before the global closeAll. For now, global closeAll is likely sufficient.
         wrappedPlugins.clear();
+
+        // Worldプロキシを復元 (Schedulerより先が良い)
+        if (this.worldProxyManager != null && isFoliaServer) {
+            this.worldProxyManager.restoreOriginalWorlds();
+            getLogger().info("[Phantom] World proxies restored.");
+        }
 
         // Scheduler を元に戻す
         if (this.schedulerManager != null) {
