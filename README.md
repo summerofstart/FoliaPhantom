@@ -142,17 +142,6 @@ For bug reports or feedback, please use GitHub Issues or contact us via Discord.
 
 ---
 
-## 🔓 ソースコード公開について（予定）
-
-このプラグインのソースコードは現在非公開ですが、後日 GitHub 上で **オープンソース（MITライセンス）として公開予定**です。\\
-
----
-
-## 🔓 Source Code Release (Planned)
-
-The source code for this plugin is currently **not public**, but we plan to release it as **open source (MIT License)** on GitHub in the near future.\\
-
-
 
 # ✨ Decompilation Permission / デコンパイル許可
 
