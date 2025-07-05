@@ -63,9 +63,9 @@ public class JarPatcher {
     private static String addFoliaSupport(String originalContent) {
         StringBuilder sb = new StringBuilder(originalContent);
         if (!originalContent.contains("folia-supported:")) {
-            if (!originalContent.endsWith("\n")) sb.append("\n"); // Corrected to not double escape
+            if (!originalContent.endsWith("\n")) sb.append("\n");
 
-            sb.append("folia-supported: true\n"); // Corrected to not double escape
+            sb.append("folia-supported: true\n");
 
         } else {
             // Ensure replacement handles various spacing and existing true/false
@@ -73,5 +73,30 @@ public class JarPatcher {
                     "folia-supported:\\s*(true|false)", "folia-supported: true"));
         }
         return sb.toString();
+    }
+
+    public static void main(String[] args) {
+        if (args.length < 2) {
+            System.err.println("Usage: java -jar <jar-file-name>.jar <original-jar-path> <patched-jar-path>");
+            System.exit(1);
+        }
+
+        File originalJar = new File(args[0]);
+        File patchedJar = new File(args[1]);
+
+        if (!originalJar.exists()) {
+            System.err.println("Error: Original JAR file not found at " + originalJar.getAbsolutePath());
+            System.exit(1);
+        }
+
+        try {
+            System.out.println("Patching " + originalJar.getName() + " to " + patchedJar.getName() + "...");
+            createFoliaSupportedJar(originalJar, patchedJar);
+            System.out.println("Successfully patched JAR: " + patchedJar.getAbsolutePath());
+        } catch (Exception e) {
+            System.err.println("Error during patching: " + e.getMessage());
+            e.printStackTrace();
+            System.exit(1);
+        }
     }
 }
