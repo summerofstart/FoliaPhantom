@@ -47,15 +47,18 @@ export async function POST(request: NextRequest) {
 
       console.log('Java Patcher STDOUT:', stdout);
       if (stderr) {
-        console.error('Java Patcher STDERR:', stderr);
-        // stderr might contain warnings or info, not necessarily errors.
-        // Check if patched file exists to be sure.
-        try {
-            await fs.access(patchedJarPath);
-        } catch (e) {
-            // If patched file doesn't exist, then it's a real error.
-            throw new Error(`Patcher failed: ${stderr}`);
-        }
+        // Stderr might contain warnings or non-fatal info. Log it as a warning.
+        console.warn('Java Patcher STDERR:', stderr);
+      }
+
+      // Verify that the patched file was actually created
+      try {
+        await fs.access(patchedJarPath);
+      } catch (accessError) {
+        // If patched file doesn't exist, this is a critical failure.
+        // Prioritize stderr if it exists, otherwise use the access error.
+        const errorDetails = stderr || (accessError instanceof Error ? accessError.message : String(accessError));
+        throw new Error(`Patcher execution failed or patched file not found. Details: ${errorDetails}`);
       }
 
       // Read the patched file
@@ -68,13 +71,21 @@ export async function POST(request: NextRequest) {
 
       return new NextResponse(patchedFileBuffer, { headers });
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error during JAR patching:', error);
       let errorMessage = 'Failed to convert JAR.';
-      if (error.stderr) {
-        errorMessage += ` Details: ${error.stderr}`;
-      } else if (error.message) {
+      if (error instanceof Error) {
         errorMessage += ` Details: ${error.message}`;
+        // Check if the error object might have stderr/stdout properties (from execFileAsync rejection)
+        const execError = error as { stderr?: string; stdout?: string };
+        if (execError.stderr) {
+          errorMessage += ` Stderr: ${execError.stderr}`;
+        }
+        if (execError.stdout) { // stdout might also contain useful info on error
+          errorMessage += ` Stdout: ${execError.stdout}`;
+        }
+      } else {
+        errorMessage += ` Details: ${String(error)}`;
       }
       return NextResponse.json({ error: errorMessage }, { status: 500 });
     } finally {
@@ -88,6 +99,12 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error('Error processing request:', error);
-    return NextResponse.json({ error: 'An unexpected error occurred.' }, { status: 500 });
+    let friendlyErrorMessage = 'An unexpected error occurred while processing your request.';
+    if (error instanceof Error) {
+        friendlyErrorMessage += ` Details: ${error.message}`
+    } else {
+        friendlyErrorMessage += ` Details: ${String(error)}`
+    }
+    return NextResponse.json({ error: friendlyErrorMessage }, { status: 500 });
   }
 }
