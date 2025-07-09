@@ -3,3 +3,4 @@ version: '1.0-SNAPSHOT'
 main: summer.foliaPhantom.FoliaPhantom
 api-version: '1.21'
 folia-supported: true
+author: marvgame
