@@ -18,7 +18,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # settings.xml はリポジトリ直下に配置してください。
+      # settings.xml is expected at the repository root
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
@@ -36,10 +36,15 @@ jobs:
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout --file FoliaPhantom/pom.xml)
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
-      - name: Create Git Tag
+      - name: Create Git Tag (if missing)
         run: |
-          git tag "v${{ env.VERSION }}"
-          git push origin "v${{ env.VERSION }}"
+          # Check if tag already exists on remote
+          if git ls-remote --tags origin | grep -q "refs/tags/v${{ env.VERSION }}$"; then
+            echo "Tag v${{ env.VERSION }} already exists on remote. Skipping tagging."
+          else
+            git tag "v${{ env.VERSION }}"
+            git push origin "v${{ env.VERSION }}"
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
